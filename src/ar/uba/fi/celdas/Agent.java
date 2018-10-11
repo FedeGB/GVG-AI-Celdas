@@ -2,11 +2,13 @@ package ar.uba.fi.celdas;
 
 import java.util.ArrayList;
 import java.util.Random;
+import java.util.Vector;
 
 import core.game.StateObservation;
 import core.player.AbstractPlayer;
 import ontology.Types;
 import tools.ElapsedCpuTimer;
+import tools.Vector2d;
 
 /**
  * Created with IntelliJ IDEA.
@@ -53,9 +55,27 @@ public class Agent extends AbstractPlayer {
     	//TODO: Replace here the content and create an autonomous agent
     	Perception perception = new Perception(stateObs);
         System.out.println(perception.toString());
-    	
+//        System.out.println(stateObs.getAvatarPosition());
         int index = randomGenerator.nextInt(actions.size());
         return actions.get(index);
+    }
+
+    private ArrayList<Types.ACTIONS> getViableActions(StateObservation stateObs) {
+        ArrayList<Vector2d> adjPos = this.getAdjacentPositions(stateObs);
+        ArrayList<Types.ACTIONS> selectedActions = new ArrayList<>();
+
+        return selectedActions;
+    }
+
+    private ArrayList<Vector2d> getAdjacentPositions(StateObservation stateObs) {
+        Vector2d avatarPos = stateObs.getAvatarPosition();
+        double unitMove = 50.0;
+        ArrayList<Vector2d> adjacents = new ArrayList<>();
+        adjacents.add(avatarPos.copy().add(unitMove, 0.0)); // Right
+        adjacents.add(avatarPos.copy().subtract(unitMove, 0.0)); // Left
+        adjacents.add(avatarPos.copy().add(0.0, unitMove)); // Down
+        adjacents.add(avatarPos.copy().subtract(0.0, unitMove)); // Up
+        return adjacents;
     }
 
 }
