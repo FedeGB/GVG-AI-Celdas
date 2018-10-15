@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Random;
 import java.util.Vector;
 
+import core.game.Observation;
 import core.game.StateObservation;
 import core.player.AbstractPlayer;
 import ontology.Types;
@@ -22,6 +23,7 @@ public class Agent extends AbstractPlayer {
      * Random generator for the agent.
      */
     protected Random randomGenerator;
+    protected Planifier planifier;
     /**
      * List of available actions for the agent
      */
@@ -39,6 +41,7 @@ public class Agent extends AbstractPlayer {
     {
         randomGenerator = new Random();
         actions = so.getAvailableActions();
+        planifier = new Planifier(so);
     }
 
 
@@ -50,32 +53,12 @@ public class Agent extends AbstractPlayer {
      * @return An action for the current state
      */
     public Types.ACTIONS act(StateObservation stateObs, ElapsedCpuTimer elapsedTimer) {
-    	
-    	
     	//TODO: Replace here the content and create an autonomous agent
-    	Perception perception = new Perception(stateObs);
-        System.out.println(perception.toString());
-//        System.out.println(stateObs.getAvatarPosition());
-        int index = randomGenerator.nextInt(actions.size());
-        return actions.get(index);
-    }
+        Types.ACTIONS action = planifier.getNextAction(stateObs);
+        System.out.println("Decision final");
+        System.out.println(action);
+        return action;
 
-    private ArrayList<Types.ACTIONS> getViableActions(StateObservation stateObs) {
-        ArrayList<Vector2d> adjPos = this.getAdjacentPositions(stateObs);
-        ArrayList<Types.ACTIONS> selectedActions = new ArrayList<>();
-
-        return selectedActions;
-    }
-
-    private ArrayList<Vector2d> getAdjacentPositions(StateObservation stateObs) {
-        Vector2d avatarPos = stateObs.getAvatarPosition();
-        double unitMove = 50.0;
-        ArrayList<Vector2d> adjacents = new ArrayList<>();
-        adjacents.add(avatarPos.copy().add(unitMove, 0.0)); // Right
-        adjacents.add(avatarPos.copy().subtract(unitMove, 0.0)); // Left
-        adjacents.add(avatarPos.copy().add(0.0, unitMove)); // Down
-        adjacents.add(avatarPos.copy().subtract(0.0, unitMove)); // Up
-        return adjacents;
     }
 
 }

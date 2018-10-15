@@ -98,6 +98,10 @@ public class Theory  implements Comparable<Theory>{
 		return this.charArrayToStr(currentState).hashCode();
 	}
 
+	public int hashCodeOnlyPredictedState() {
+		return this.charArrayToStr(predictedState).hashCode();
+	}
+
    @Override
    public boolean equals(Object obj) {
       if (this == obj)
