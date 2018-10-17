@@ -22,6 +22,8 @@ public class Planifier {
     private Map<Integer, Integer> repetition;
     private Map<Vector2d, ArrayList<ActionCounter>> actionOnPoint;
     private ArrayList<Theory> uselessTheories;
+    private int randomCount = 0;
+    private int mejorCount = 0;
 
     public Planifier(StateObservation so) {
         randomGenerator = new Random();
@@ -154,6 +156,7 @@ public class Planifier {
                 System.out.println((float) best.getSuccessCount() / best.getUsedCount());
                 actionToTake = best.getAction();
                 System.out.println(actionToTake);
+                mejorCount++;
                 break;
             }
         }
@@ -176,7 +179,7 @@ public class Planifier {
             actionToTake = viable.get(index);
             System.out.println("Accion random");
             System.out.println(actionToTake);
-
+            randomCount++;
         }
         try {
             TheoryPersistant.save(theories);
@@ -204,6 +207,8 @@ public class Planifier {
 //        updateActionCounter(currentState, actionToTake);
         lastState = currentState;
         lastAction = actionToTake;
+        System.out.println("Random: "  + randomCount);
+        System.out.println("Mejor: " + mejorCount);
         return actionToTake;
     }
 
@@ -252,9 +257,15 @@ public class Planifier {
         int yState = 0;
         for(int x = -1; x < 2; x++) {
             for(int y = -1; y < 2; y++) {
-                if(avatarPos.y < 0 && avatarPos.x < 0) avatarPos.mul(-1);
-                stateReturn[xState][yState] = level[(int) avatarPos.y + y][(int) avatarPos.x + x];
-                if(stateReturn[xState][yState] == 'A') stateReturn[xState][yState] = '.';
+                if((xState == 1) && (yState == 0 || yState == 2)) {
+                    stateReturn[yState][xState] = level[(int) avatarPos.y + y][(int) avatarPos.x + x];
+                } else if((xState == 0 || xState == 2) && yState == 1) {
+                    stateReturn[yState][xState] = level[(int) avatarPos.y + y][(int) avatarPos.x + x];
+                } else {
+                    stateReturn[yState][xState] = 'F';
+                }
+//                stateReturn[yState][xState] = level[(int) avatarPos.y + y][(int) avatarPos.x + x];
+//                if(stateReturn[yState][xState] == 'A') stateReturn[yState][xState] = '.';
                 yState++;
             }
             xState++;
@@ -283,20 +294,20 @@ public class Planifier {
         char[][] actualState = getState(actualPer.getLevel(), getAvatarPositionFixed(current));
         actual.setCurrentState(actualState);
         List<Theory> found = map.get(actual.hashCodeOnlyCurrentState());
-//        if(found != null) {
-//            for(Theory foundTheory : found) {
-//                if(java.util.Arrays.deepEquals(foundTheory.getCurrentState(), theo.getCurrentState())) {
-//                    System.out.println("theories were found");
-//                    listToUse.add(foundTheory);
-//                }
-//            }
-//        }
-        return found; //listToUse;
+        if(found != null) {
+            for(Theory foundTheory : found) {
+                if(foundTheory.hashCodeOnlyCurrentState() == theo.hashCodeOnlyPredictedState()) {
+                    System.out.println("theories were found");
+                    listToUse.add(foundTheory);
+                }
+            }
+        }
+        return listToUse;
     }
 
     private Theory evaluateBestCandidate(List<Theory> listToUse, StateObservation currentState) {
         Theory bestTheory = null;
-        listToUse.sort(comparatorSuccess);
+        listToUse.sort(comparatorUtility);
 
         for (Theory eval : listToUse) {
             ArrayList<Types.ACTIONS> viable = getViableActions(currentState, new Perception(currentState));
@@ -304,7 +315,9 @@ public class Planifier {
             if(lastAction == eval.getAction()) continue;
             Integer times = repetition.get(eval.hashCode());
             if(times == null) times = 0;
-            if(times > 4) continue; // skip overuse
+            if(times > 10) {
+                continue; // skip overuse
+            }
             bestTheory = eval;
             break;
         }
