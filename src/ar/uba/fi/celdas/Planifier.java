@@ -5,7 +5,6 @@ import core.game.StateObservation;
 import ontology.Types;
 import tools.Vector2d;
 
-import javax.sound.midi.SysexMessage;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.*;
@@ -20,6 +19,9 @@ public class Planifier {
     private StateObservation lastState;
     private Comparator<Theory> comparatorUtility;
     private Comparator<Theory> comparatorSuccess;
+    private Map<Integer, Integer> repetition;
+    private Map<Vector2d, ArrayList<ActionCounter>> actionOnPoint;
+    private ArrayList<Theory> uselessTheories;
 
     public Planifier(StateObservation so) {
         randomGenerator = new Random();
@@ -30,6 +32,7 @@ public class Planifier {
         finishPos = position;
         lastState = null;
         lastAction = null;
+        uselessTheories = new ArrayList<>();
         comparatorUtility = (left, right) -> {
             if (left.getUtility() < right.getUtility()) {
                 return 1;
@@ -46,6 +49,8 @@ public class Planifier {
             }
             return 0;
         };
+        repetition = new HashMap<>();
+        actionOnPoint = new HashMap<>();
         try {
             theories = TheoryPersistant.load();
         } catch (FileNotFoundException e) {
@@ -57,19 +62,27 @@ public class Planifier {
         StateObservation currentState = stateObs.copy();
         Types.ACTIONS actionToTake = Types.ACTIONS.ACTION_UP;
         if(lastState == null && lastAction == null) {
+//            updateActionCounter(currentState, actionToTake);
             lastState = currentState;
             lastAction = actionToTake;
             return actionToTake;
         }
         Perception previousPerception = new Perception(lastState);
-        System.out.println(previousPerception.toString());
+        Perception currentPerception = new Perception(currentState);
+        System.out.println(currentPerception.toString());
 
         Theory localTheory = new Theory();
-        Vector2d avatarCurrentPosition = getAvatarPositionFixed(lastState);
-        localTheory.setCurrentState(getState(previousPerception.getLevel(), avatarCurrentPosition));
+        Vector2d avatarPreviousPosition = getAvatarPositionFixed(lastState);
+        localTheory.setCurrentState(getState(previousPerception.getLevel(), avatarPreviousPosition));
         localTheory.setAction(lastAction);
         localTheory.setPredictedState(getPredictedState(currentState));
-        if(theories.getTheories().isEmpty()) {
+//        ArrayList<Types.ACTIONS> viableActions = getViableActions(currentState,new Perception(currentState));
+//        boolean theoryUseless = false;
+//        if(viableActions.size() == 1) {
+//            uselessTheories.add(localTheory);
+//            theoryUseless = true;
+//        }
+        if(/*!theoryUseless && */theories.getTheories().isEmpty()) {
             localTheory.setUsedCount(1);
             localTheory.setSuccessCount(1);
             localTheory.setUtility(getUtilityBasedOnRef(currentState));
@@ -79,17 +92,29 @@ public class Planifier {
                 // Should never happen since there are no theories!
             }
 
-        } else {
+        } else /*if(!theoryUseless) */{
             Map<Integer, List<Theory>> mapaTeorias = theories.getTheories();
-            if(theories.existsTheory(localTheory) || mapaTeorias.containsKey(localTheory.hashCodeOnlyCurrentState())) {
+            boolean recentlyAdded = false;
+            if(!theories.existsTheory(localTheory)) {
+                localTheory.setUsedCount(1);
+                localTheory.setSuccessCount(1);
+                localTheory.setUtility(getUtilityBasedOnRef(currentState));
+                try {
+                    theories.add(localTheory);
+                    recentlyAdded = true;
+                } catch (Exception e) {
+                    // Should never happen since there are no equal theories!
+                }
+            }
+            if(mapaTeorias.containsKey(localTheory.hashCodeOnlyCurrentState())) {
                 List<Theory> equalTheories = mapaTeorias.get(localTheory.hashCodeOnlyCurrentState());
                 for(final ListIterator<Theory> teoiter = equalTheories.listIterator(); teoiter.hasNext();) {
                     final Theory teo = teoiter.next();
-                    if(teo.equals(localTheory)/*getPredictedState() == localTheory.getPredictedState()*/) {
+                    if(teo.equals(localTheory) && !recentlyAdded) { // iguales
                         teo.setSuccessCount(teo.getSuccessCount() + 1);
                         teo.setUsedCount(teo.getUsedCount() + 1);
                         teoiter.set(teo);
-                    } else {
+                    } else { // similares
                         teo.setUsedCount(teo.getUsedCount() + 1);
                         teoiter.set(teo);
                     }
@@ -111,13 +136,22 @@ public class Planifier {
         ArrayList<Theory> wantedList = getWantedList(theories, localTheory);
         List<Theory> toUse = null;
         Theory best = null;
+        Types.ACTIONS actionToAvoid = null;
         for(Theory theo : wantedList) {
             toUse = hasPathTheCurrentState(currentState, theo);
             if(toUse != null && !toUse.isEmpty()) {
                 best = evaluateBestCandidate(toUse, currentState);
+//                for(Theory useless : uselessTheories) {
+//                    if(best != null && java.util.Arrays.deepEquals(useless.getPredictedState(), best.getPredictedState())) {
+//                        actionToAvoid = best.getAction();
+//                        best = null;
+//
+//                    }
+//                }
             }
             if(best != null) {
                 System.out.println("Accion mejor");
+                System.out.println((float) best.getSuccessCount() / best.getUsedCount());
                 actionToTake = best.getAction();
                 System.out.println(actionToTake);
                 break;
@@ -125,16 +159,49 @@ public class Planifier {
         }
         if(toUse == null || toUse.isEmpty() || best == null) {
             ArrayList<Types.ACTIONS> viable = getViableActions(currentState, new Perception(currentState));
+//            if(actionToAvoid != null) {
+//                viable.remove(actionToAvoid);
+//            }
+//                ArrayList<ActionCounter> counterCurrent = actionOnPoint.get(avatarCurrentPosition);
+//                int maxValueCounter = 0;
+//                for(Types.ACTIONS option : viable) {
+//                    for(ActionCounter counter : counterCurrent) {
+//                        if(option == counter.action && counter.amount > maxValueCounter) {
+//                            maxValueCounter = counter.amount;
+//                            actionToTake = counter.action;
+//                        }
+//                    }
+//                }
             int index = randomGenerator.nextInt(viable.size());
             actionToTake = viable.get(index);
             System.out.println("Accion random");
             System.out.println(actionToTake);
+
         }
         try {
             TheoryPersistant.save(theories);
         } catch (IOException e) {
             e.printStackTrace();
         }
+        Integer times;
+        if(best != null) {
+            times = repetition.get(best.hashCode());
+            if(times == null) times = 0;
+            times++;
+            repetition.put(best.hashCode(), times);
+        } else {
+            Theory forRepetition = new Theory();
+            forRepetition.setCurrentState(getPredictedState(currentState));
+            forRepetition.setAction(actionToTake);
+            StateObservation pred = currentState.copy();
+            pred.advance(actionToTake);
+            forRepetition.setPredictedState(getPredictedState(pred));
+            times = repetition.get(forRepetition.hashCode());
+            if(times == null) times = 0;
+            times++;
+            repetition.put(forRepetition.hashCode(), times);
+        }
+//        updateActionCounter(currentState, actionToTake);
         lastState = currentState;
         lastAction = actionToTake;
         return actionToTake;
@@ -185,6 +252,7 @@ public class Planifier {
         int yState = 0;
         for(int x = -1; x < 2; x++) {
             for(int y = -1; y < 2; y++) {
+                if(avatarPos.y < 0 && avatarPos.x < 0) avatarPos.mul(-1);
                 stateReturn[xState][yState] = level[(int) avatarPos.y + y][(int) avatarPos.x + x];
                 if(stateReturn[xState][yState] == 'A') stateReturn[xState][yState] = '.';
                 yState++;
@@ -202,8 +270,8 @@ public class Planifier {
 
     private ArrayList<Theory> getWantedList(Theories theories, Theory local) {
          List<Theory> allTheory = theories.getTheories().get(local.hashCodeOnlyCurrentState());
-         ArrayList<Theory> wantedList = new ArrayList<>(allTheory);
-         wantedList.sort(comparatorUtility);
+        ArrayList<Theory> wantedList = new ArrayList<>(allTheory);
+         wantedList.sort(comparatorSuccess);
          return wantedList;
     }
 
@@ -223,26 +291,42 @@ public class Planifier {
 //                }
 //            }
 //        }
-        return found;//listToUse;
+        return found; //listToUse;
     }
 
     private Theory evaluateBestCandidate(List<Theory> listToUse, StateObservation currentState) {
         Theory bestTheory = null;
-        boolean checkLast = true;
-        if(listToUse.size() > 1) {
-            listToUse.sort(comparatorSuccess);
-            checkLast = false;
-        }
+        listToUse.sort(comparatorSuccess);
 
         for (Theory eval : listToUse) {
             ArrayList<Types.ACTIONS> viable = getViableActions(currentState, new Perception(currentState));
             if(!viable.contains(eval.getAction())) continue;
-            if(checkLast && lastAction == eval.getAction()) continue;
-            if(checkLast && eval.getUsedCount() > 50) continue;
+            if(lastAction == eval.getAction()) continue;
+            Integer times = repetition.get(eval.hashCode());
+            if(times == null) times = 0;
+            if(times > 4) continue; // skip overuse
             bestTheory = eval;
             break;
         }
         return bestTheory;
+    }
+
+    private void updateActionCounter(StateObservation currentState, Types.ACTIONS actionToTake) {
+        Vector2d posActual = getAvatarPositionFixed(currentState);
+        ArrayList<ActionCounter> actionList = actionOnPoint.get(posActual);
+        if(actionList == null) {
+            actionList = new ArrayList<>();
+            ActionCounter newActionC = new ActionCounter(actionToTake);
+            newActionC.sumAction();
+            actionList.add(newActionC);
+        } else {
+            for(ActionCounter counter : actionList) {
+                if(counter.action == actionToTake) {
+                    counter.sumAction();
+                }
+            }
+        }
+        actionOnPoint.put(posActual, actionList);
     }
 
 }
