@@ -21,10 +21,10 @@ public class Theorizer {
 
     }
 
-    public Theories updateResultsTheories(Theories theories, Theory lastTheory, boolean IsAlive) {
+    public Theories updateResultsTheories(Theories theories, Theory lastTheory, StateObservation currentState, Vector2d finishPos, boolean moved, boolean IsAlive) {
 
+        Map<Integer, List<Theory>> mapaTeorias = theories.getTheories();
         if(theories.existsTheory(lastTheory)) {
-            Map<Integer, List<Theory>> mapaTeorias = theories.getTheories();
             List<Theory> equalTheories = mapaTeorias.get(lastTheory.hashCodeOnlyCurrentState());
             for (final ListIterator<Theory> teoiter = equalTheories.listIterator(); teoiter.hasNext(); ) {
                 final Theory teo = teoiter.next();
@@ -42,12 +42,25 @@ public class Theorizer {
             mapaTeorias.put(lastTheory.hashCodeOnlyCurrentState(), equalTheories);
             theories.setTheories(mapaTeorias);
         } else {
-            // TODO: Tengo que ver si tienen similares y copiar los valores de used y success sumandole al success de esta y al used en ambas
-            // TODO: pasar metodo de ultility aca y ver de usar este metodo para actualizar teorias en general
+            List<Theory> equalTheories = mapaTeorias.get(lastTheory.hashCodeOnlyCurrentState());
+            if(!equalTheories.isEmpty()) {
+                for (final ListIterator<Theory> teoiter = equalTheories.listIterator(); teoiter.hasNext(); ) {
+                    final Theory teo = teoiter.next();
+                    teo.setUsedCount(teo.getUsedCount() + 1);
+                    teoiter.set(teo);
+                }
+                mapaTeorias.put(lastTheory.hashCodeOnlyCurrentState(), equalTheories);
+                theories.setTheories(mapaTeorias);
+            }
             if(IsAlive) {
                 lastTheory.setUsedCount(1);
-                lastTheory.setUtility(1000);
-                lastTheory.setSuccessCount(1);
+                if(moved) {
+                    lastTheory.setUtility(getUtilityBasedOnRef(currentState, finishPos));
+                    lastTheory.setSuccessCount(1);
+                } else {
+                    lastTheory.setSuccessCount(0);
+                    lastTheory.setUtility(0);
+                }
             } else {
                 lastTheory.setUtility(0);
                 lastTheory.setUsedCount(1);
@@ -130,6 +143,12 @@ public class Theorizer {
     public char[][] getReducedState(StateObservation so) {
         Perception percept = new Perception(so);
         return getState(percept.getLevel(), getAvatarPositionFixed(so));
+    }
+
+    public float getUtilityBasedOnRef(StateObservation predicted, Vector2d finishPos) {
+        Vector2d refPos = getAvatarPositionFixed(predicted);
+        double distance = finishPos.dist(refPos);
+        return 1000 / (float)(1 + distance);
     }
 
 }

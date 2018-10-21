@@ -109,26 +109,14 @@ public class Agent extends AbstractPlayer {
             buildNewLocalTheory = true;
         }
 
-        if(buildNewLocalTheory) {
-            localTheory.setUsedCount(1);
-            if(currentPosition.equals(lastPosition)) {
-                localTheory.setSuccessCount(0);
-                localTheory.setUtility(0);
-            } else {
-                localTheory.setSuccessCount(1);
-                localTheory.setUtility(getUtilityBasedOnRef(currentState));
-            }
-            try {
-                theories.add(localTheory);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
+        theories = theorizer.updateResultsTheories(theories, localTheory, currentState, finishPos, !currentPosition.equals(lastPosition),true);
         if(selectNewTheory) {
             // TODO: Select theory and update counter
+            
         } else {
             ArrayList<Types.ACTIONS> leftOver = new ArrayList<>(actions);
             leftOver.removeAll(actionsDone);
+            if(leftOver.isEmpty()) leftOver = actions;
             actionToTake = theorizer.getRandomActionFromList(leftOver);
         }
 
@@ -137,12 +125,6 @@ public class Agent extends AbstractPlayer {
         lastPosition = theorizer.getAvatarPositionFixed(currentState);
         return actionToTake;
 
-    }
-
-    public float getUtilityBasedOnRef(StateObservation predicted) {
-        Vector2d refPos = theorizer.getAvatarPositionFixed(predicted);
-        double distance = finishPos.dist(refPos);
-        return 1000 / (float)(1 + distance);
     }
 
     public void result(StateObservation stateObs, ElapsedCpuTimer elapsedCpuTimer)
@@ -156,7 +138,7 @@ public class Agent extends AbstractPlayer {
             lastTheory.setCurrentState(lastPerception.getLevel());
             lastTheory.setAction(lastAction);
             lastTheory.setPredictedState(currentPerception.getLevel());
-            theories = theorizer.updateResultsTheories(theories, lastTheory, IsAlive);
+            theories = theorizer.updateResultsTheories(theories, lastTheory, stateObs, finishPos, true, IsAlive);
             try {
                 TheoryPersistant.save(theories);
             } catch (Exception e) {
