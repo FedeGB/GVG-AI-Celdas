@@ -34,6 +34,8 @@ public class Agent extends AbstractPlayer {
     private Comparator<Theory> comparatorSuccess;
     private Theorizer theorizer;
     private Vector2d finishPos;
+    private List<Integer> vertexPath;
+
     /**
      * List of available actions for the agent
      */
@@ -56,12 +58,16 @@ public class Agent extends AbstractPlayer {
         } catch (FileNotFoundException e) {
             theories = new Theories();
         }
-        planifier = new Planifier(so);
-        theorizer = new Theorizer();
         ArrayList<Observation>[] portals = so.getPortalsPositions();
         Vector2d position = portals[0].get(0).position;
-        position.mul(1/(float)so.getBlockSize());
+        position.x = position.x / so.getBlockSize();
+        position.y = position.y / so.getBlockSize();
         finishPos = position;
+        theorizer = new Theorizer(finishPos);
+        planifier = new Planifier(theories);
+        if(planifier.foundFinishPoint()) {
+            planifier.buildGraph();
+        }
     }
 
 
@@ -76,19 +82,38 @@ public class Agent extends AbstractPlayer {
         StateObservation currentState = stateObs.copy();
         Types.ACTIONS actionToTake = theorizer.getRandomActionFromList(actions);
         Vector2d currentPosition = theorizer.getAvatarPositionFixed(currentState);
+        Perception currentPerception = new Perception(currentState);
+        System.out.println(currentPerception);
         if(lastState == null && lastAction == null) {
             lastState = currentState;
-            lastAction = actionToTake;
             lastPosition = currentPosition;
+            if(planifier.foundFinishPoint()) {
+                Theory auxiliar = new Theory();
+                auxiliar.setCurrentState(currentPerception.getLevel());
+                vertexPath = planifier.getShortestPath(auxiliar.hashCodeOnlyCurrentState());
+                actionToTake = planifier.getNextActionOnPath(vertexPath, auxiliar.hashCodeOnlyCurrentState());
+                if(actionToTake != null) {
+                    lastAction = actionToTake;
+                    return actionToTake;
+                }
+            }
+            lastAction = actionToTake;
             return actionToTake;
         }
         Perception lastPerception = new Perception(lastState);
-        Perception currentPerception = new Perception(currentState);
         Theory localTheory = new Theory();
         localTheory.setCurrentState(lastPerception.getLevel());
         localTheory.setAction(lastAction);
         localTheory.setPredictedState(currentPerception.getLevel());
-        boolean buildNewLocalTheory = false;
+        if(planifier.foundFinishPoint()) {
+            actionToTake = planifier.getNextActionOnPath(vertexPath, localTheory.hashCodeOnlyPredictedState());
+            if(actionToTake != null) {
+                lastState = currentState;
+                lastAction = actionToTake;
+                lastPosition = theorizer.getAvatarPositionFixed(currentState);
+                return actionToTake;
+            }
+        }
         boolean selectNewTheory = false;
         List<Theory> listOfTheories = theories.getSortedListForCurrentState(localTheory);
         List<Types.ACTIONS> actionsDone = new ArrayList<>();
@@ -98,21 +123,19 @@ public class Agent extends AbstractPlayer {
             }
             if(actionsDone.size() == actions.size()) { // All actions done
                 selectNewTheory = true;
-                // TODO: Select theory and update counter
             } else { // Not all done, maybe explore
                 if(!theorizer.shouldExplore()) {
                     selectNewTheory = true;
-//                    buildNewLocalTheory = true;
                 }
             }
-        } else {
-            buildNewLocalTheory = true;
         }
 
-        theories = theorizer.updateResultsTheories(theories, localTheory, currentState, finishPos, !currentPosition.equals(lastPosition),true);
+        theories = theorizer.updateResultsTheories(theories, localTheory, currentState, !currentPosition.equals(lastPosition),true);
         if(selectNewTheory) {
-            // TODO: Select theory and update counter
-            
+            Theory selected =  theorizer.evaluateBestCandidate(theories.getSortedListForCurrentState(localTheory));
+            actionToTake = selected.getAction();
+            System.out.println("selected theory");
+            System.out.println(actionToTake);
         } else {
             ArrayList<Types.ACTIONS> leftOver = new ArrayList<>(actions);
             leftOver.removeAll(actionsDone);
@@ -138,7 +161,7 @@ public class Agent extends AbstractPlayer {
             lastTheory.setCurrentState(lastPerception.getLevel());
             lastTheory.setAction(lastAction);
             lastTheory.setPredictedState(currentPerception.getLevel());
-            theories = theorizer.updateResultsTheories(theories, lastTheory, stateObs, finishPos, true, IsAlive);
+            theories = theorizer.updateResultsTheories(theories, lastTheory, stateObs, true, IsAlive);
             try {
                 TheoryPersistant.save(theories);
             } catch (Exception e) {

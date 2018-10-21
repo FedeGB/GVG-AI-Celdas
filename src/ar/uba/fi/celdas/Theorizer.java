@@ -1,27 +1,45 @@
 package ar.uba.fi.celdas;
 
+import core.game.Observation;
 import core.game.StateObservation;
 import ontology.Types;
 import tools.Vector2d;
 
-import java.util.List;
-import java.util.ListIterator;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 
 public class Theorizer {
 
     protected Random randomGenerator;
+    private Comparator<Theory> comparatorUtility;
+    private Comparator<Theory> comparatorSuccess;
+    private Vector2d finishPos;
 
-    Theorizer() {
+    Theorizer(Vector2d finalPos) {
         randomGenerator = new Random();
+        comparatorUtility = (left, right) -> {
+            if (left.getUtility() < right.getUtility()) {
+                return 1;
+            } else if(left.getUtility() > right.getUtility()) {
+                return -1;
+            }
+            return 0;
+        };
+        comparatorSuccess = (left, right) -> {
+            if ((float)left.getSuccessCount() / left.getUsedCount() < (float)right.getSuccessCount() / right.getUsedCount()) {
+                return 1;
+            } else if((float)left.getSuccessCount() / left.getUsedCount() > (float)right.getSuccessCount() / right.getUsedCount()) {
+                return -1;
+            }
+            return 0;
+        };
+        finishPos = finalPos;
     }
 
     public void evaluateSituation(Theories theories, StateObservation currentState) {
 
     }
 
-    public Theories updateResultsTheories(Theories theories, Theory lastTheory, StateObservation currentState, Vector2d finishPos, boolean moved, boolean IsAlive) {
+    public Theories updateResultsTheories(Theories theories, Theory lastTheory, StateObservation currentState, boolean moved, boolean IsAlive) {
 
         Map<Integer, List<Theory>> mapaTeorias = theories.getTheories();
         if(theories.existsTheory(lastTheory)) {
@@ -43,7 +61,7 @@ public class Theorizer {
             theories.setTheories(mapaTeorias);
         } else {
             List<Theory> equalTheories = mapaTeorias.get(lastTheory.hashCodeOnlyCurrentState());
-            if(!equalTheories.isEmpty()) {
+            if(equalTheories != null && !equalTheories.isEmpty()) {
                 for (final ListIterator<Theory> teoiter = equalTheories.listIterator(); teoiter.hasNext(); ) {
                     final Theory teo = teoiter.next();
                     teo.setUsedCount(teo.getUsedCount() + 1);
@@ -55,7 +73,7 @@ public class Theorizer {
             if(IsAlive) {
                 lastTheory.setUsedCount(1);
                 if(moved) {
-                    lastTheory.setUtility(getUtilityBasedOnRef(currentState, finishPos));
+                    lastTheory.setUtility(getUtilityBasedOnRef(currentState));
                     lastTheory.setSuccessCount(1);
                 } else {
                     lastTheory.setSuccessCount(0);
@@ -86,12 +104,16 @@ public class Theorizer {
 
     public boolean shouldExplore() {
         // par explora, impar no explora
-        return (randomGenerator.nextInt(1000) % 2) == 0;
+        return (randomGenerator.nextInt(100) % 2) == 0;
     }
 
     public Vector2d getAvatarPositionFixed(StateObservation stateObs) {
         Vector2d avatarPos = stateObs.getAvatarPosition();
-        avatarPos.mul(1/(float)stateObs.getBlockSize());
+        if(avatarPos.x < 0 && avatarPos.y < 0) { // Correction after taking portal
+            avatarPos = finishPos;
+        }
+        avatarPos.x = avatarPos.x / stateObs.getBlockSize();
+        avatarPos.y = avatarPos.y / stateObs.getBlockSize();
         return avatarPos;
     }
 
@@ -145,10 +167,24 @@ public class Theorizer {
         return getState(percept.getLevel(), getAvatarPositionFixed(so));
     }
 
-    public float getUtilityBasedOnRef(StateObservation predicted, Vector2d finishPos) {
+    public float getUtilityBasedOnRef(StateObservation predicted) {
         Vector2d refPos = getAvatarPositionFixed(predicted);
-        double distance = finishPos.dist(refPos);
+        double distance = refPos.dist(finishPos);
+        System.out.println(refPos);
+        System.out.println(distance);
         return 1000 / (float)(1 + distance);
+    }
+
+    public Theory evaluateBestCandidate(List<Theory> listToUse) {
+        listToUse.sort(comparatorUtility);
+        Theory selected;
+        if(shouldExplore()) {
+            selected = listToUse.get(randomGenerator.nextInt(listToUse.size()));
+        } else {
+            selected = listToUse.get(0);
+        }
+
+        return selected;
     }
 
 }
