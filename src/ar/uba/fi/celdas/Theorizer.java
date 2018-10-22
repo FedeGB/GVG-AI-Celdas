@@ -11,7 +11,7 @@ public class Theorizer {
 
     protected Random randomGenerator;
     private Comparator<Theory> comparatorUtility;
-    private Comparator<Theory> comparatorSuccess;
+//    private Comparator<Theory> comparatorSuccess;
     private Vector2d finishPos;
 
     Theorizer(Vector2d finalPos) {
@@ -24,19 +24,15 @@ public class Theorizer {
             }
             return 0;
         };
-        comparatorSuccess = (left, right) -> {
-            if ((float)left.getSuccessCount() / left.getUsedCount() < (float)right.getSuccessCount() / right.getUsedCount()) {
-                return 1;
-            } else if((float)left.getSuccessCount() / left.getUsedCount() > (float)right.getSuccessCount() / right.getUsedCount()) {
-                return -1;
-            }
-            return 0;
-        };
+//        comparatorSuccess = (left, right) -> {
+//            if ((float)left.getSuccessCount() / left.getUsedCount() < (float)right.getSuccessCount() / right.getUsedCount()) {
+//                return 1;
+//            } else if((float)left.getSuccessCount() / left.getUsedCount() > (float)right.getSuccessCount() / right.getUsedCount()) {
+//                return -1;
+//            }
+//            return 0;
+//        };
         finishPos = finalPos;
-    }
-
-    public void evaluateSituation(Theories theories, StateObservation currentState) {
-
     }
 
     public Theories updateResultsTheories(Theories theories, Theory lastTheory, StateObservation currentState, boolean moved, boolean IsAlive) {
@@ -52,7 +48,7 @@ public class Theorizer {
                         teo.setSuccessCount(teo.getSuccessCount() + 1);
                     }
                     teoiter.set(teo);
-                } else { // similares
+                } else if(IsAlive) { // similares
                     teo.setUsedCount(teo.getUsedCount() + 1);
                     teoiter.set(teo);
                 }
@@ -138,33 +134,6 @@ public class Theorizer {
             yState = 0;
         }
         return stateReturn;
-    }
-
-    public char[][] getPredictedAvatarStateByAction(StateObservation currentState, Vector2d avatarCurPos, Types.ACTIONS actionToTake) {
-        Vector2d predictedPos = avatarCurPos.copy();
-        switch (actionToTake) {
-            case ACTION_UP:
-                avatarCurPos.subtract(0, 1);
-                break;
-            case ACTION_DOWN:
-                avatarCurPos.add(0,1);
-                break;
-            case ACTION_LEFT:
-                avatarCurPos.subtract(1, 0);
-                break;
-            case ACTION_RIGHT:
-                avatarCurPos.add(1, 0);
-                break;
-            default:
-                break;
-        }
-        Perception percept = new Perception(currentState);
-        return getState(percept.getLevel(), predictedPos);
-    }
-
-    public char[][] getReducedState(StateObservation so) {
-        Perception percept = new Perception(so);
-        return getState(percept.getLevel(), getAvatarPositionFixed(so));
     }
 
     public float getUtilityBasedOnRef(StateObservation predicted) {

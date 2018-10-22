@@ -30,8 +30,8 @@ public class Agent extends AbstractPlayer {
     private Types.ACTIONS lastAction;
     private StateObservation lastState;
     private Vector2d lastPosition;
-    private Comparator<Theory> comparatorUtility;
-    private Comparator<Theory> comparatorSuccess;
+//    private Comparator<Theory> comparatorUtility;
+//    private Comparator<Theory> comparatorSuccess;
     private Theorizer theorizer;
     private Vector2d finishPos;
     private List<Integer> vertexPath;
